@@ -30,7 +30,8 @@ the game.
 
 ## Development
 
-- `main` — default branch, deployed to GitHub Pages on every push.
+- `main` — default branch; every push mirrors it into `gh-pages`, which
+  GitHub Pages serves.
 - `fabian-branch` — working branch.
 
 ## Legal
