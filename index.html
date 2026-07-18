@@ -591,23 +591,45 @@ async function gemini(parts){
   const key=$('gKey').value.trim();
   if(!key){toast('Paste your Gemini API key first');throw 0;}
   const model=$('gModel').value.trim()||'gemini-2.5-flash-image';
-  const res=await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({contents:[{parts}],
-       generationConfig:{responseModalities:['TEXT','IMAGE']}})});
-  if(!res.ok){
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+  const body=JSON.stringify({contents:[{parts}],
+    generationConfig:{responseModalities:['TEXT','IMAGE']}});
+  for(let attempt=0;;attempt++){
+    const res=await fetch(url,
+      {method:'POST',headers:{'Content-Type':'application/json'},body});
+    if(res.ok){
+      const j=await res.json();
+      const ps=(((j.candidates||[])[0]||{}).content||{}).parts||[];
+      for(const p of ps){
+        if(p.inlineData&&p.inlineData.data){
+          return 'data:'+(p.inlineData.mimeType||'image/png')+';base64,'+p.inlineData.data;
+        }
+      }
+      throw new Error('No image in response (safety block or text-only reply)');
+    }
     const t=await res.text();
+    if(res.status===429){
+      /* rate limit: Google suggests a wait in the error body (RetryInfo) */
+      if(attempt<2){
+        let wait=30;
+        const m=/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(t);
+        if(m)wait=Math.min(120,Math.ceil(parseFloat(m[1]))+1);
+        toast('Gemini rate limit — retrying in '+wait+'s ('+(attempt+1)+' of 2)');
+        await new Promise(r=>setTimeout(r,wait*1000));
+        continue;
+      }
+      throw new Error('Still rate-limited (429). Free-tier image models allow '
+        +'only a few requests per minute and a small daily quota — wait a '
+        +'minute (or a day if the daily cap is hit), or upgrade the key\'s '
+        +'plan in Google AI Studio.');
+    }
+    if(res.status===400&&/API key/i.test(t))
+      throw new Error('Invalid API key — re-paste it from Google AI Studio.');
+    if(res.status===403)
+      throw new Error('Key not allowed to use '+model+' (403) — check the '
+        +'key\'s restrictions in Google AI Studio.');
     throw new Error('API '+res.status+': '+t.slice(0,180));
   }
-  const j=await res.json();
-  const ps=(((j.candidates||[])[0]||{}).content||{}).parts||[];
-  for(const p of ps){
-    if(p.inlineData&&p.inlineData.data){
-      return 'data:'+(p.inlineData.mimeType||'image/png')+';base64,'+p.inlineData.data;
-    }
-  }
-  throw new Error('No image in response (safety block or text-only reply)');
 }
 function composePrompt(){
   return `2D game sprite asset: ${PART_HINT[curPart]}. `
