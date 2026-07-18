@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Kaiju Forge</title>
+<meta name="theme-color" content="#191b20">
+<style>
+  :root{--bg:#191b20;--panel:#22252c;--line:rgba(255,255,255,0.09);--txt:#d8dce2;
+    --amber:#f2b25c;--amberglow:rgba(255,150,50,0.25);}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI",system-ui,sans-serif;-webkit-user-select:none;user-select:none;
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;}
+  #app{display:grid;grid-template-rows:auto 1fr auto;height:100vh;height:100dvh;}
+  /* ---- top bar ---- */
+  #top{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);
+    border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  #top h1{margin:0;font-size:15px;letter-spacing:3px;color:var(--amber);font-weight:800;
+    text-shadow:0 0 12px var(--amberglow);}
+  select,input[type=text],input[type=password],textarea{background:#15171c;color:var(--txt);
+    border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;}
+  button{appearance:none;background:rgba(255,255,255,0.06);color:var(--txt);
+    border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:13px;
+    font-weight:600;cursor:pointer;touch-action:manipulation;min-height:36px;}
+  button:active{transform:scale(0.97);}
+  button.active,button.primary{background:rgba(255,150,50,0.20);border-color:rgba(255,160,60,0.6);
+    color:#ffd9a8;}
+  #partTabs{display:flex;gap:4px;flex-wrap:wrap;}
+  #partTabs button{padding:6px 9px;font-size:12px;min-height:32px;}
+  /* ---- main ---- */
+  #main{display:grid;grid-template-columns:52px 1fr minmax(240px,300px);min-height:0;}
+  #toolCol{display:flex;flex-direction:column;gap:5px;padding:8px 5px;background:var(--panel);
+    border-right:1px solid var(--line);overflow-y:auto;}
+  #toolCol button{width:42px;height:42px;min-height:42px;padding:0;font-size:17px;}
+  #stage{position:relative;min-width:0;min-height:0;display:flex;align-items:center;
+    justify-content:center;overflow:hidden;
+    background:repeating-conic-gradient(#20232a 0% 25%,#191b20 0% 50%) 0 0/22px 22px;}
+  #edit,#overlay{position:absolute;image-rendering:auto;touch-action:none;}
+  #overlay{pointer-events:auto;}
+  #side{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;
+    display:flex;flex-direction:column;min-height:0;scrollbar-width:thin;}
+  .acc{border-bottom:1px solid var(--line);}
+  .acc>.hd{padding:10px 12px;font-weight:800;font-size:12px;letter-spacing:2px;color:#ffd9a8;
+    cursor:pointer;display:flex;justify-content:space-between;}
+  .acc>.bd{padding:4px 12px 14px 12px;display:none;}
+  .acc.open>.bd{display:block;}
+  .row{display:flex;gap:6px;align-items:center;margin:7px 0;flex-wrap:wrap;}
+  .row label{font-size:11.5px;color:rgba(220,224,230,0.75);min-width:64px;}
+  .row input[type=range]{flex:1;min-width:80px;}
+  .row input[type=color]{width:38px;height:30px;border:none;background:none;padding:0;}
+  textarea{width:100%;box-sizing:border-box;resize:vertical;min-height:56px;}
+  /* ---- bottom preview ---- */
+  #bottom{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);
+    border-top:1px solid var(--line);flex-wrap:wrap;}
+  #prevWrap{background:#101216;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  #prev{display:block;}
+  #toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;
+    background:rgba(20,22,26,0.92);color:#ffd9a8;border:1px solid rgba(255,160,60,0.5);
+    padding:8px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .25s;
+    pointer-events:none;max-width:80vw;text-align:center;}
+  .hint{font-size:11px;color:rgba(220,224,230,0.5);line-height:1.5;margin-top:6px;}
+  @media (max-width:900px){
+    #main{grid-template-columns:48px 1fr minmax(200px,240px);}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <h1>KAIJU FORGE</h1>
+    <select id="species"></select>
+    <div id="partTabs"></div>
+    <span style="flex:1"></span>
+    <button id="undoBtn" title="Undo">&#8630;</button>
+    <button id="redoBtn" title="Redo">&#8631;</button>
+    <button id="clearBtn" title="Clear part">&#128465;</button>
+  </div>
+  <div id="main">
+    <div id="toolCol">
+      <button data-t="brush" class="active" title="Brush">&#128396;</button>
+      <button data-t="erase" title="Eraser">&#9723;</button>
+      <button data-t="fill" title="Fill">&#129524;</button>
+      <button data-t="grad" title="Gradient (drag)">&#9698;</button>
+      <button data-t="speck" title="Speckle texture">&#10039;</button>
+      <button data-t="move" title="Move imported/AI object">&#10021;</button>
+    </div>
+    <div id="stage">
+      <canvas id="edit"></canvas>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div id="side">
+      <div class="acc open" id="accPaint">
+        <div class="hd">PAINT<span>&#9662;</span></div>
+        <div class="bd">
+          <div class="row"><label>Color</label><input type="color" id="pColor" value="#4d4238">
+            <label>Size</label><input type="range" id="pSize" min="2" max="60" value="14"></div>
+          <div class="row"><label>Opacity</label><input type="range" id="pOpacity" min="5" max="100" value="100">
+            <label>Soft</label><input type="range" id="pSoft" min="0" max="100" value="30"></div>
+          <div class="row">
+            <button id="fxOutline">Outline</button>
+            <button id="fxGlow">Glow</button>
+            <input type="color" id="fxColor" value="#ff9632">
+          </div>
+          <div class="row"><label>Hue</label><input type="range" id="hHue" min="-180" max="180" value="0">
+            <button id="hApply">Apply HSL</button></div>
+          <div class="row"><label>Sat</label><input type="range" id="hSat" min="-100" max="100" value="0">
+            <label>Light</label><input type="range" id="hLit" min="-100" max="100" value="0"></div>
+          <div class="row">
+            <button id="importImg">Import image&#8230;</button>
+            <input type="file" id="importFile" accept="image/*" style="display:none">
+            <button id="stampBtn">Stamp object</button>
+          </div>
+          <div class="hint">Draw facing RIGHT. Dorsal fins belong on the LEFT edge of the torso
+            (that's the back). The dashed guide shows the part's expected proportions.</div>
+        </div>
+      </div>
+      <div class="acc" id="accAI">
+        <div class="hd">AI &#8212; GEMINI<span>&#9662;</span></div>
+        <div class="bd">
+          <div class="row"><input type="password" id="gKey" placeholder="Gemini API key" style="flex:1"></div>
+          <div class="row"><input type="text" id="gModel" value="gemini-2.5-flash-image" style="flex:1"></div>
+          <div class="row"><select id="gStyle" style="flex:1">
+            <option value="painted 1950s tokusatsu movie style, soft airbrushed shading, muted colors">Tokusatsu painted</option>
+            <option value="bold comic book ink style, heavy outlines, cel shading">Comic ink</option>
+            <option value="detailed pixel art style">Pixel art</option>
+            <option value="loose watercolor illustration style">Watercolor</option>
+          </select></div>
+          <textarea id="gPrompt" placeholder="Describe the kaiju (e.g. armored lava turtle with obsidian shell...)"></textarea>
+          <div class="row">
+            <button id="gGen" class="primary">Generate part</button>
+            <button id="gEdit">Edit canvas</button>
+          </div>
+          <div class="row"><label style="min-width:auto">
+            <input type="checkbox" id="gChroma" checked> green-screen removal</label></div>
+          <div class="hint">Generate: makes this part from your description. Edit canvas: sends the
+            current drawing to Gemini with your instruction ("make the fins glow blue"). Results
+            arrive as a draggable object &#8212; position it, then Stamp.</div>
+        </div>
+      </div>
+      <div class="acc" id="accVFX">
+        <div class="hd">VFX LAB<span>&#9662;</span></div>
+        <div class="bd">
+          <div class="row"><select id="vPreset" style="flex:1">
+            <option value="beam">Beam burst</option><option value="boom">Explosion</option>
+            <option value="smoke">Smoke</option><option value="spark">Sparkle</option>
+          </select><button id="vPlay">Preview</button></div>
+          <div class="row"><label>Rate</label><input type="range" id="vRate" min="1" max="20" value="6">
+            <label>Life</label><input type="range" id="vLife" min="10" max="120" value="40"></div>
+          <div class="row"><label>Speed</label><input type="range" id="vSpeed" min="1" max="16" value="6">
+            <label>Size</label><input type="range" id="vSize" min="2" max="30" value="8"></div>
+          <div class="row"><label>Gravity</label><input type="range" id="vGrav" min="-10" max="10" value="0">
+            <label style="min-width:auto"><input type="checkbox" id="vAdd" checked> additive</label></div>
+          <div class="row"><input type="color" id="vC1" value="#ffdc96"><input type="color" id="vC2" value="#ff8c32">
+            <button id="vExport">Export vfx.json</button></div>
+          <canvas id="vCanvas" width="260" height="120" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#101216"></canvas>
+        </div>
+      </div>
+      <div class="acc" id="accSFX">
+        <div class="hd">SFX LAB<span>&#9662;</span></div>
+        <div class="bd">
+          <div class="row"><select id="sPreset" style="flex:1">
+            <option value="roar">Saurian roar</option><option value="bellow">Ape bellow</option>
+            <option value="hiss">Serpent hiss</option><option value="klaxon">Klaxon</option>
+            <option value="laser">Laser</option><option value="boom">Boom</option>
+          </select><button id="sPlay" class="primary">&#9654; Play</button></div>
+          <div class="row"><label>Pitch</label><input type="range" id="sPitch" min="30" max="300" value="90">
+            <label>Fall</label><input type="range" id="sFall" min="10" max="100" value="60"></div>
+          <div class="row"><label>Noise</label><input type="range" id="sNoise" min="0" max="100" value="40">
+            <label>Length</label><input type="range" id="sLen" min="20" max="300" value="130"></div>
+          <div class="row"><button id="sExport">Export .wav</button></div>
+        </div>
+      </div>
+      <div class="acc open" id="accExport">
+        <div class="hd">EXPORT<span>&#9662;</span></div>
+        <div class="bd">
+          <div class="row"><button id="sendGame" class="primary" style="flex:1">&#128640; Send to Titan Sandbox</button></div>
+          <div class="row"><button id="openGame" style="flex:1">Open the game &#8599;</button></div>
+          <div class="row">
+            <button id="dlPart">Part PNG</button>
+            <button id="dlZip">sprites.zip</button>
+          </div>
+          <div class="row">
+            <button id="projSave">Save project</button>
+            <button id="projLoadBtn">Load project&#8230;</button>
+            <input type="file" id="projLoad" accept=".kaijuforge,application/json" style="display:none">
+          </div>
+          <div class="row"><button id="clearSend">Remove my skins from the game</button></div>
+          <div class="hint">"Send" hands your parts to Titan Sandbox through shared browser
+            storage (both sites live on the same domain) &#8212; open the game and your kaiju is
+            wearing them. The zip works with the game's sprites/ folder too.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="bottom">
+    <div id="prevWrap"><canvas id="prev" width="360" height="200"></canvas></div>
+    <button data-m="idle" class="active pm">Idle</button>
+    <button data-m="walk" class="pm">Walk</button>
+    <button data-m="roar" class="pm">Roar</button>
+    <button id="flipBtn">&#8646; Turn</button>
+    <span class="hint" style="margin:0">Live rig preview &#8212; parts animate exactly like in-game.</span>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+'use strict';
+(function(){
+const $=id=>document.getElementById(id);
+const TAU=Math.PI*2;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const rand=(a,b)=>a+Math.random()*(b-a);
+let toastT=null;
+function toast(m){const e=$('toast');e.textContent=m;e.style.opacity=1;
+  clearTimeout(toastT);toastT=setTimeout(()=>e.style.opacity=0,2200);}
+
+/* ============ species + part dims (mirrors Titan Sandbox) ============ */
+const SPECIES={
+  titan:{z:1,armL:1,legL:1,tailZ:1,fur:false,serpent:false},
+  ape:{z:0.97,armL:1.75,legL:0.85,tailZ:0.35,fur:true,serpent:false},
+  drax:{z:1.05,armL:1,legL:1,tailZ:1.1,fur:false,serpent:true},
+  scorn:{z:1.04,armL:0.5,legL:1,tailZ:1.25,fur:false,serpent:false},
+  mecha:{z:1.03,armL:1,legL:1,tailZ:0.9,fur:false,serpent:false},
+  hydrax:{z:1.06,armL:0.8,legL:1,tailZ:1.15,fur:false,serpent:false},
+  vang:{z:1.02,armL:1.05,legL:1.05,tailZ:0.45,fur:false,serpent:false},
+};
+const NAMES={titan:'Titan',ape:'Goliath',drax:'Ravok',scorn:'Scorn',mecha:'Meka',hydrax:'Hydrax',vang:'Vanguard'};
+const PARTS=['torso','head','jaw','arm','leg','tail0','tail1','tail2','wings'];
+function dims(k){
+  const sp=SPECIES[k],s=sp.z;
+  const D={};
+  D.torsoW=(sp.fur?134:118)*s;D.torsoH=(sp.fur?150:162)*s;
+  D.headW=(sp.fur?74:sp.serpent?88:94)*s;D.headH=(sp.fur?64:sp.serpent?54:58)*s;
+  D.jawW=(sp.fur?48:sp.serpent?60:64)*s;D.jawH=(sp.fur?16:sp.serpent?16:18)*s;
+  D.armW=(sp.fur?40:sp.armL<0.8?17:26)*s;D.armH=74*s*sp.armL;
+  D.legW=(sp.fur?58:52)*s;D.legH=138*s*sp.legL;
+  const tz=sp.tailZ,th2=Math.min(1,tz+0.3);
+  D.tail=[[102*s*tz,46*s*th2],[92*s*tz,32*s*th2],[86*s*tz,20*s*th2]];
+  if(sp.serpent)D.tail=[[128*s,62*s],[112*s,46*s],[96*s,30*s]];
+  D.standH=D.legH+D.torsoH/2-34*s;
+  D.s=s;
+  return D;
+}
+function partSize(k,part){
+  const D=dims(k),s=D.s;
+  switch(part){
+    case 'torso':return [D.torsoW+104*s,D.torsoH+104*s];
+    case 'head':return [D.headW+68*s,D.headH+68*s];
+    case 'jaw':return [D.jawW+32*s,D.jawH+32*s];
+    case 'arm':return [D.armW*1.5+36*s,D.armH+36*s];
+    case 'leg':return [D.legW+72*s,D.legH+72*s];
+    case 'tail0':return [D.tail[0][0]+60*s,D.tail[0][1]+60*s];
+    case 'tail1':return [D.tail[1][0]+60*s,D.tail[1][1]+60*s];
+    case 'tail2':return [D.tail[2][0]+60*s,D.tail[2][1]+60*s];
+    case 'wings':return [D.torsoW*2.6,D.torsoH*1.35];
+  }
+}
+const PART_HINT={
+  torso:'full torso, barrel chest and belly, dorsal fins on the LEFT (back) edge',
+  head:'head with rounded snout pointing RIGHT, eye, upper teeth',
+  jaw:'lower jaw wedge, teeth pointing up, hinge end on the LEFT',
+  arm:'one arm hanging down with claws at the bottom',
+  leg:'one thick leg, clawed foot pointing RIGHT at the bottom',
+  tail0:'thick tail segment, thick end RIGHT, fins on top',
+  tail1:'middle tail segment, fins on top',
+  tail2:'tail tip segment, pointed LEFT end, fins on top',
+  wings:'pair of spread bat-like wings seen from behind'
+};
+
+/* ============ editor state ============ */
+let curSpecies='titan',curPart='torso';
+const store={}; /* store[species][part] = canvas */
+function partCanvas(k,part,create){
+  store[k]=store[k]||{};
+  if(!store[k][part]&&create){
+    const [w,h]=partSize(k,part);
+    const c=document.createElement('canvas');
+    c.width=Math.round(w);c.height=Math.round(h);
+    store[k][part]=c;
+  }
+  return store[k][part];
+}
+const edit=$('edit'),ectx=edit.getContext('2d');
+const over=$('overlay'),octx=over.getContext('2d');
+let view={scale:1,ox:0,oy:0};
+let tool='brush';
+let history=[],future=[];
+let obj=null; /* floating object {img,x,y,scale,rot} */
+
+function fitView(){
+  const st=$('stage');
+  const c=partCanvas(curSpecies,curPart,true);
+  const pad=30;
+  const sc=Math.min((st.clientWidth-pad)/c.width,(st.clientHeight-pad)/c.height,4);
+  view.scale=sc;
+  edit.width=c.width;edit.height=c.height;
+  edit.style.width=over.style.width=(c.width*sc)+'px';
+  edit.style.height=over.style.height=(c.height*sc)+'px';
+  over.width=c.width;over.height=c.height;
+  redraw();
+}
+function redraw(){
+  const c=partCanvas(curSpecies,curPart,true);
+  ectx.clearRect(0,0,edit.width,edit.height);
+  ectx.drawImage(c,0,0);
+  drawOverlay();
+}
+function drawOverlay(){
+  octx.clearRect(0,0,over.width,over.height);
+  /* proportion guide */
+  octx.strokeStyle='rgba(255,178,92,0.35)';
+  octx.setLineDash([6,5]);
+  octx.lineWidth=1.5;
+  octx.strokeRect(4,4,over.width-8,over.height-8);
+  octx.setLineDash([]);
+  /* center pivot cross */
+  octx.strokeStyle='rgba(120,190,255,0.5)';
+  octx.beginPath();
+  octx.moveTo(over.width/2-8,over.height/2);octx.lineTo(over.width/2+8,over.height/2);
+  octx.moveTo(over.width/2,over.height/2-8);octx.lineTo(over.width/2,over.height/2+8);
+  octx.stroke();
+  if(obj){
+    octx.save();
+    octx.translate(obj.x,obj.y);
+    octx.rotate(obj.rot);
+    octx.scale(obj.scale,obj.scale);
+    octx.globalAlpha=0.9;
+    octx.drawImage(obj.img,-obj.img.width/2,-obj.img.height/2);
+    octx.restore();
+    octx.strokeStyle='rgba(120,220,140,0.8)';
+    octx.setLineDash([4,4]);
+    const w=obj.img.width*obj.scale,h=obj.img.height*obj.scale;
+    octx.strokeRect(obj.x-w/2,obj.y-h/2,w,h);
+    octx.setLineDash([]);
+  }
+}
+function pushHistory(){
+  const c=partCanvas(curSpecies,curPart,true);
+  history.push(c.toDataURL());
+  if(history.length>25)history.shift();
+  future.length=0;
+}
+function restore(url){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=partCanvas(curSpecies,curPart,true);
+      const g=c.getContext('2d');
+      g.clearRect(0,0,c.width,c.height);
+      g.drawImage(img,0,0);
+      redraw();res();
+    };
+    img.src=url;
+  });
+}
+$('undoBtn').onclick=async()=>{
+  if(!history.length)return;
+  const c=partCanvas(curSpecies,curPart,true);
+  future.push(c.toDataURL());
+  await restore(history.pop());
+  saveSoon();
+};
+$('redoBtn').onclick=async()=>{
+  if(!future.length)return;
+  history.push(partCanvas(curSpecies,curPart,true).toDataURL());
+  await restore(future.pop());
+  saveSoon();
+};
+$('clearBtn').onclick=()=>{
+  pushHistory();
+  const c=partCanvas(curSpecies,curPart,true);
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+  redraw();saveSoon();
+};
+
+/* ---- painting ---- */
+function evPt(e){
+  const r=over.getBoundingClientRect();
+  return {x:(e.clientX-r.left)/view.scale*(over.width/(r.width/view.scale*view.scale))*1*(over.width/over.width),
+          y:0};
+}
+function pt(e){
+  const r=over.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*(over.width/r.width),
+          y:(e.clientY-r.top)*(over.height/r.height)};
+}
+let drawing=false,last=null,gradStart=null,objDrag=null;
+over.addEventListener('pointerdown',e=>{
+  e.preventDefault();
+  over.setPointerCapture(e.pointerId);
+  const p=pt(e);
+  if(tool==='move'&&obj){
+    const w=obj.img.width*obj.scale,h=obj.img.height*obj.scale;
+    const corner=Math.hypot(p.x-(obj.x+w/2),p.y-(obj.y+h/2))<20;
+    objDrag={mode:corner?'scale':'drag',sx:p.x,sy:p.y,ox:obj.x,oy:obj.y,os:obj.scale};
+    return;
+  }
+  pushHistory();
+  drawing=true;last=p;
+  if(tool==='grad')gradStart=p;
+  else if(tool==='fill')doFill(p);
+  else strokeTo(p,p);
+});
+over.addEventListener('pointermove',e=>{
+  const p=pt(e);
+  if(objDrag&&obj){
+    if(objDrag.mode==='drag'){obj.x=objDrag.ox+(p.x-objDrag.sx);obj.y=objDrag.oy+(p.y-objDrag.sy);}
+    else{obj.scale=Math.max(0.05,objDrag.os*(1+(p.x-objDrag.sx)/140));}
+    drawOverlay();return;
+  }
+  if(!drawing)return;
+  if(tool==='grad'){drawOverlay();
+    octx.strokeStyle='#8ec6ff';octx.beginPath();
+    octx.moveTo(gradStart.x,gradStart.y);octx.lineTo(p.x,p.y);octx.stroke();
+    return;}
+  strokeTo(last,p);last=p;
+});
+function endStroke(e){
+  if(objDrag){objDrag=null;return;}
+  if(!drawing)return;
+  drawing=false;
+  if(tool==='grad'&&gradStart){
+    const p=pt(e);
+    const g=partCanvas(curSpecies,curPart,true).getContext('2d');
+    const gr=g.createLinearGradient(gradStart.x,gradStart.y,p.x,p.y);
+    gr.addColorStop(0,$('pColor').value);
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    g.globalAlpha=$('pOpacity').value/100;
+    g.fillStyle=gr;
+    g.fillRect(0,0,g.canvas.width,g.canvas.height);
+    g.globalAlpha=1;
+    gradStart=null;redraw();
+  }
+  saveSoon();
+}
+over.addEventListener('pointerup',endStroke);
+over.addEventListener('pointercancel',endStroke);
+function strokeTo(a,b){
+  const c=partCanvas(curSpecies,curPart,true);
+  const g=c.getContext('2d');
+  const size=+$('pSize').value,soft=$('pSoft').value/100,op=$('pOpacity').value/100;
+  g.globalCompositeOperation=tool==='erase'?'destination-out':'source-over';
+  const steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/(size*0.3)));
+  for(let i=0;i<=steps;i++){
+    const x=a.x+(b.x-a.x)*i/steps,y=a.y+(b.y-a.y)*i/steps;
+    if(tool==='speck'){
+      for(let k=0;k<3;k++){
+        g.globalAlpha=op*rand(0.1,0.35);
+        g.fillStyle=Math.random()<0.5?'#120d09':$('pColor').value;
+        g.beginPath();
+        g.arc(x+rand(-size,size),y+rand(-size,size),rand(0.6,2.4),0,TAU);
+        g.fill();
+      }
+    }else{
+      const gr=g.createRadialGradient(x,y,0,x,y,size/2);
+      const col=tool==='erase'?'rgba(0,0,0,1)':$('pColor').value;
+      gr.addColorStop(0,col);
+      gr.addColorStop(clamp(1-soft,0.05,1),col);
+      gr.addColorStop(1,tool==='erase'?'rgba(0,0,0,0)':hexA($('pColor').value,0));
+      g.globalAlpha=op;
+      g.fillStyle=gr;
+      g.beginPath();g.arc(x,y,size/2,0,TAU);g.fill();
+    }
+  }
+  g.globalAlpha=1;
+  g.globalCompositeOperation='source-over';
+  redraw();
+}
+function hexA(hex,a){
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function doFill(p){
+  const c=partCanvas(curSpecies,curPart,true);
+  const g=c.getContext('2d');
+  g.globalAlpha=$('pOpacity').value/100;
+  g.fillStyle=$('pColor').value;
+  g.fillRect(0,0,c.width,c.height);
+  g.globalAlpha=1;
+  redraw();
+}
+/* effects */
+$('fxOutline').onclick=()=>{applyEffect(false);};
+$('fxGlow').onclick=()=>{applyEffect(true);};
+function applyEffect(glow){
+  pushHistory();
+  const c=partCanvas(curSpecies,curPart,true);
+  const tmp=document.createElement('canvas');
+  tmp.width=c.width;tmp.height=c.height;
+  const tg=tmp.getContext('2d');
+  tg.shadowColor=$('fxColor').value;
+  tg.shadowBlur=glow?14:0;
+  if(!glow){
+    for(const [dx,dy] of [[-2,0],[2,0],[0,-2],[0,2]])tg.drawImage(c,dx,dy);
+    tg.globalCompositeOperation='source-in';
+    tg.fillStyle=$('fxColor').value;
+    tg.fillRect(0,0,tmp.width,tmp.height);
+    tg.globalCompositeOperation='source-over';
+  }else tg.drawImage(c,0,0);
+  const g=c.getContext('2d');
+  const keep=document.createElement('canvas');
+  keep.width=c.width;keep.height=c.height;
+  keep.getContext('2d').drawImage(c,0,0);
+  g.clearRect(0,0,c.width,c.height);
+  g.drawImage(tmp,0,0);
+  g.drawImage(keep,0,0);
+  redraw();saveSoon();
+}
+$('hApply').onclick=()=>{
+  pushHistory();
+  const c=partCanvas(curSpecies,curPart,true);
+  const g=c.getContext('2d');
+  const d=g.getImageData(0,0,c.width,c.height);
+  const hue=+$('hHue').value,sat=+$('hSat').value/100,lit=+$('hLit').value/100;
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    if(px[i+3]===0)continue;
+    let [h,s,l]=rgb2hsl(px[i],px[i+1],px[i+2]);
+    h=(h+hue/360+1)%1;
+    s=clamp(s+sat,0,1);
+    l=clamp(l+lit,0,1);
+    const [r,gr2,b]=hsl2rgb(h,s,l);
+    px[i]=r;px[i+1]=gr2;px[i+2]=b;
+  }
+  g.putImageData(d,0,0);
+  $('hHue').value=0;$('hSat').value=0;$('hLit').value=0;
+  redraw();saveSoon();
+};
+function rgb2hsl(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+  let h=0,s=0;const l=(mx+mn)/2;
+  if(mx!==mn){
+    const d=mx-mn;
+    s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r)h=(g-b)/d+(g<b?6:0);
+    else if(mx===g)h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h/=6;
+  }
+  return [h,s,l];
+}
+function hsl2rgb(h,s,l){
+  if(s===0){const v=Math.round(l*255);return [v,v,v];}
+  const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  const f=t=>{
+    t=(t+1)%1;
+    if(t<1/6)return p+(q-p)*6*t;
+    if(t<1/2)return q;
+    if(t<2/3)return p+(q-p)*(2/3-t)*6;
+    return p;
+  };
+  return [Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)];
+}
+/* import / stamp */
+$('importImg').onclick=()=>$('importFile').click();
+$('importFile').onchange=e=>{
+  const f=e.target.files[0];
+  if(!f)return;
+  const img=new Image();
+  img.onload=()=>{placeObject(img);};
+  img.src=URL.createObjectURL(f);
+  e.target.value='';
+};
+function placeObject(img){
+  const c=partCanvas(curSpecies,curPart,true);
+  const sc=Math.min(c.width/img.width,c.height/img.height)*0.9;
+  obj={img,x:c.width/2,y:c.height/2,scale:sc,rot:0};
+  tool='move';
+  document.querySelectorAll('#toolCol button').forEach(b=>b.classList.toggle('active',b.dataset.t==='move'));
+  drawOverlay();
+  toast('Object placed — drag to position, corner to scale, then Stamp');
+}
+$('stampBtn').onclick=()=>{
+  if(!obj){toast('Nothing to stamp — import or generate first');return;}
+  pushHistory();
+  const g=partCanvas(curSpecies,curPart,true).getContext('2d');
+  g.save();
+  g.translate(obj.x,obj.y);
+  g.rotate(obj.rot);
+  g.scale(obj.scale,obj.scale);
+  g.drawImage(obj.img,-obj.img.width/2,-obj.img.height/2);
+  g.restore();
+  obj=null;
+  redraw();saveSoon();
+};
+
+/* ============ Gemini ============ */
+$('gKey').value=localStorage.getItem('kf_gemini_key')||'';
+$('gKey').onchange=()=>localStorage.setItem('kf_gemini_key',$('gKey').value.trim());
+async function gemini(parts){
+  const key=$('gKey').value.trim();
+  if(!key){toast('Paste your Gemini API key first');throw 0;}
+  const model=$('gModel').value.trim()||'gemini-2.5-flash-image';
+  const res=await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({contents:[{parts}],
+       generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+  if(!res.ok){
+    const t=await res.text();
+    throw new Error('API '+res.status+': '+t.slice(0,180));
+  }
+  const j=await res.json();
+  const ps=(((j.candidates||[])[0]||{}).content||{}).parts||[];
+  for(const p of ps){
+    if(p.inlineData&&p.inlineData.data){
+      return 'data:'+(p.inlineData.mimeType||'image/png')+';base64,'+p.inlineData.data;
+    }
+  }
+  throw new Error('No image in response (safety block or text-only reply)');
+}
+function composePrompt(){
+  return `2D game sprite asset: ${PART_HINT[curPart]}. `
+    +`Giant kaiju monster: ${$('gPrompt').value||'original giant kaiju'}. `
+    +`${$('gStyle').value}. Side view, flat orthographic, facing right, `
+    +`single isolated piece centered with padding, `
+    +($('gChroma').checked?'plain solid pure green #00FF00 background.':'transparent background.');
+}
+async function aiButton(btn,parts){
+  btn.disabled=true;
+  const old=btn.textContent;
+  btn.textContent='…';
+  try{
+    const url=await gemini(parts);
+    const img=new Image();
+    img.onload=()=>{
+      placeObject($('gChroma').checked?chromaKey(img):img);
+    };
+    img.src=url;
+  }catch(err){
+    if(err)toast(''+(err.message||err));
+  }
+  btn.disabled=false;
+  btn.textContent=old;
+}
+$('gGen').onclick=()=>aiButton($('gGen'),[{text:composePrompt()}]);
+$('gEdit').onclick=()=>{
+  const c=partCanvas(curSpecies,curPart,true);
+  const b64=c.toDataURL('image/png').split(',')[1];
+  const instr=$('gPrompt').value||'improve the shading';
+  aiButton($('gEdit'),[
+    {text:`Edit this 2D game sprite: ${instr}. Keep the same silhouette, `
+      +`orientation (facing right) and canvas framing. `
+      +($('gChroma').checked?'Return on a plain solid pure green #00FF00 background.':'Keep the background transparent.')},
+    {inline_data:{mime_type:'image/png',data:b64}}
+  ]);
+};
+function chromaKey(img){
+  const c=document.createElement('canvas');
+  c.width=img.width;c.height=img.height;
+  const g=c.getContext('2d');
+  g.drawImage(img,0,0);
+  const d=g.getImageData(0,0,c.width,c.height);
+  const px=d.data;
+  for(let i=0;i<px.length;i+=4){
+    const r=px[i],gg=px[i+1],b=px[i+2];
+    if(gg>110&&gg>r*1.5&&gg>b*1.5)px[i+3]=0;
+  }
+  g.putImageData(d,0,0);
+  return c;
+}
+
+/* ============ rig preview ============ */
+const prev=$('prev'),pctx=prev.getContext('2d');
+let mode='idle',facing=1,phase=0;
+document.querySelectorAll('.pm').forEach(b=>b.onclick=()=>{
+  mode=b.dataset.m;
+  document.querySelectorAll('.pm').forEach(x=>x.classList.toggle('active',x===b));
+});
+$('flipBtn').onclick=()=>facing*=-1;
+function partImg(part){
+  const c=(store[curSpecies]||{})[part];
+  if(c){
+    /* has content? */
+    return c;
+  }
+  return null;
+}
+function dpPrev(c2,px,py,w,h){
+  if(c2)pctx.drawImage(c2,px-w/2,py-h/2,w,h);
+  else{
+    pctx.fillStyle='rgba(255,255,255,0.07)';
+    pctx.fillRect(px-w/2,py-h/2,w,h);
+    pctx.strokeStyle='rgba(255,178,92,0.25)';
+    pctx.strokeRect(px-w/2,py-h/2,w,h);
+  }
+}
+function drawPreview(now){
+  const D=dims(curSpecies);
+  const scale=150/(D.standH+D.torsoH/2+40);
+  pctx.setTransform(1,0,0,1,0,0);
+  pctx.clearRect(0,0,prev.width,prev.height);
+  /* ground */
+  pctx.fillStyle='#2a2d34';
+  pctx.fillRect(0,prev.height-18,prev.width,18);
+  const walk=mode==='walk'?1:0;
+  if(mode==='walk')phase+=0.07;
+  const jaw=mode==='roar'?0.45+Math.sin(now/150)*0.05:0.05;
+  const groundY2=prev.height-18;
+  const bodyH=(D.standH+D.torsoH/2)*scale;
+  const cx=prev.width/2,cy=groundY2-bodyH/2;
+  pctx.save();
+  pctx.translate(cx,cy-Math.abs(Math.sin(phase))*4*walk);
+  pctx.scale(facing,1);
+  const S2=v=>v*scale;
+  const torsoY=-bodyH/2+S2(D.torsoH)/2;
+  /* tail chain */
+  pctx.save();
+  pctx.translate(-S2(D.torsoW*0.40),torsoY+S2(D.torsoH*0.24));
+  const tails=['tail0','tail1','tail2'];
+  for(let i=0;i<3;i++){
+    pctx.rotate(-(0.07+0.09*i)+Math.sin(now/520+i*0.7)*0.05+Math.sin(phase-i*0.5)*0.06*walk);
+    const tw2=S2(D.tail[i][0]),th3=S2(D.tail[i][1]);
+    pctx.save();
+    pctx.translate(-tw2*0.42,0);
+    dpPrev(partImg(tails[i]),0,0,tw2*1.5,th3*2.4);
+    pctx.restore();
+    pctx.translate(-tw2*0.84,0);
+  }
+  pctx.restore();
+  const hipY=torsoY+S2(D.torsoH*0.42),shY=torsoY-S2(D.torsoH*0.22);
+  const legA=Math.sin(phase)*0.4*walk,legB=Math.sin(phase+Math.PI)*0.4*walk;
+  const armA=Math.sin(phase+Math.PI)*0.26*walk,armB=Math.sin(phase)*0.26*walk;
+  const limb=(px,py,ang,ay,part,w,h)=>{
+    pctx.save();
+    pctx.translate(px,py);
+    pctx.rotate(ang);
+    pctx.globalAlpha=0.92;
+    dpPrev(partImg(part),0,ay,w,h);
+    pctx.globalAlpha=1;
+    pctx.restore();
+  };
+  limb(S2(D.torsoW*0.16),shY,armB,S2(D.armH*0.36),'arm',S2(D.armW*2),S2(D.armH*1.4));
+  limb(S2(D.torsoW*0.01),hipY,legB,S2(D.legH*0.40),'leg',S2(D.legW*2.2),S2(D.legH*1.5));
+  dpPrev(partImg('torso'),0,torsoY,S2(D.torsoW+104),S2(D.torsoH+104));
+  limb(S2(D.torsoW*0.20),hipY,legA,S2(D.legH*0.40),'leg',S2(D.legW*2.2),S2(D.legH*1.5));
+  limb(S2(D.torsoW*0.34),shY,armA,S2(D.armH*0.36),'arm',S2(D.armW*2),S2(D.armH*1.4));
+  /* head + jaw */
+  const headX=S2(30),headY=torsoY-S2(D.torsoH*0.5+D.headH*0.5-8);
+  pctx.save();
+  pctx.translate(headX,headY);
+  pctx.rotate(Math.sin(phase+0.6)*0.05*walk);
+  pctx.save();
+  pctx.translate(-S2(D.headW*0.16),S2(D.headH*0.36));
+  pctx.rotate(jaw);
+  dpPrev(partImg('jaw'),S2(D.jawW*0.34),S2(5),S2(D.jawW*1.5),S2(D.jawH*2.8));
+  pctx.restore();
+  dpPrev(partImg('head'),0,0,S2(D.headW+68),S2(D.headH+68));
+  pctx.restore();
+  pctx.restore();
+}
+
+/* ============ VFX lab ============ */
+const vps=[];
+const vC=$('vCanvas'),vg=vC.getContext('2d');
+let vPlaying=0;
+$('vPlay').onclick=()=>{vPlaying=performance.now()+2400;};
+const VPRE={
+  beam:{rate:8,life:30,speed:9,size:6,grav:0,add:1,c1:'#ffdc96',c2:'#ff8c32'},
+  boom:{rate:14,life:44,speed:6,size:9,grav:1,add:1,c1:'#fff0c8',c2:'#ff6428'},
+  smoke:{rate:4,life:80,speed:2,size:14,grav:-2,add:0,c1:'#6a6662',c2:'#3a3836'},
+  spark:{rate:10,life:26,speed:7,size:3,grav:4,add:1,c1:'#ffffff',c2:'#78beff'},
+};
+$('vPreset').onchange=()=>{
+  const p=VPRE[$('vPreset').value];
+  $('vRate').value=p.rate;$('vLife').value=p.life;$('vSpeed').value=p.speed;
+  $('vSize').value=p.size;$('vGrav').value=p.grav;$('vAdd').checked=!!p.add;
+  $('vC1').value=p.c1;$('vC2').value=p.c2;
+};
+function vfxStep(now){
+  vg.fillStyle='rgba(16,18,22,0.28)';
+  vg.fillRect(0,0,vC.width,vC.height);
+  if(now<vPlaying){
+    for(let i=0;i<+$('vRate').value/2;i++){
+      const a=rand(-0.5,0.5);
+      vps.push({x:30,y:vC.height/2,vx:Math.cos(a)*+$('vSpeed').value,
+        vy:Math.sin(a)*+$('vSpeed').value,life:+$('vLife').value,max:+$('vLife').value});
+    }
+  }
+  vg.globalCompositeOperation=$('vAdd').checked?'lighter':'source-over';
+  for(let i=vps.length-1;i>=0;i--){
+    const p=vps[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=(+$('vGrav').value)/60;p.life--;
+    if(p.life<=0){vps.splice(i,1);continue;}
+    const a=p.life/p.max;
+    const gr=vg.createRadialGradient(p.x,p.y,0,p.x,p.y,+$('vSize').value);
+    gr.addColorStop(0,hexA($('vC1').value,a));
+    gr.addColorStop(1,hexA($('vC2').value,0));
+    vg.fillStyle=gr;
+    vg.beginPath();vg.arc(p.x,p.y,+$('vSize').value,0,TAU);vg.fill();
+  }
+  vg.globalCompositeOperation='source-over';
+}
+$('vExport').onclick=()=>{
+  const cfg={rate:+$('vRate').value,life:+$('vLife').value,speed:+$('vSpeed').value,
+    size:+$('vSize').value,gravity:+$('vGrav').value,additive:$('vAdd').checked,
+    colors:[$('vC1').value,$('vC2').value]};
+  dl('vfx.json',new Blob([JSON.stringify(cfg,null,2)],{type:'application/json'}));
+};
+
+/* ============ SFX lab ============ */
+let AC=null;
+function ac(){if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended')AC.resume();return AC;}
+const SPRE={
+  roar:{pitch:90,fall:60,noise:40,len:130},
+  bellow:{pitch:55,fall:40,noise:55,len:110},
+  hiss:{pitch:200,fall:80,noise:95,len:120},
+  klaxon:{pitch:180,fall:25,noise:5,len:90},
+  laser:{pitch:300,fall:95,noise:15,len:40},
+  boom:{pitch:60,fall:75,noise:70,len:120},
+};
+$('sPreset').onchange=()=>{
+  const p=SPRE[$('sPreset').value];
+  $('sPitch').value=p.pitch;$('sFall').value=p.fall;
+  $('sNoise').value=p.noise;$('sLen').value=p.len;
+};
+function renderSfx(ctx2){
+  const t=0;
+  const len=+$('sLen').value/100;
+  const pitch=+$('sPitch').value;
+  const fall=+$('sFall').value/100;
+  const noiseAmt=+$('sNoise').value/100;
+  const o=ctx2.createOscillator();
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(pitch,t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20,pitch*(1-fall)),t+len);
+  const og=ctx2.createGain();
+  og.gain.setValueAtTime(0.0001,t);
+  og.gain.exponentialRampToValueAtTime(0.4*(1-noiseAmt*0.5),t+0.04);
+  og.gain.exponentialRampToValueAtTime(0.001,t+len);
+  const f=ctx2.createBiquadFilter();
+  f.type='lowpass';f.frequency.value=900;
+  o.connect(f);f.connect(og);og.connect(ctx2.destination);
+  o.start(t);o.stop(t+len+0.05);
+  if(noiseAmt>0.02){
+    const nb=ctx2.createBuffer(1,ctx2.sampleRate*(len+0.1),ctx2.sampleRate);
+    const d=nb.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const src=ctx2.createBufferSource();
+    src.buffer=nb;
+    const nf=ctx2.createBiquadFilter();
+    nf.type='bandpass';nf.Q.value=1;
+    nf.frequency.setValueAtTime(400+pitch*4,t);
+    nf.frequency.exponentialRampToValueAtTime(Math.max(80,(400+pitch*4)*(1-fall)),t+len);
+    const ng=ctx2.createGain();
+    ng.gain.setValueAtTime(0.0001,t);
+    ng.gain.exponentialRampToValueAtTime(0.35*noiseAmt,t+0.05);
+    ng.gain.exponentialRampToValueAtTime(0.001,t+len);
+    src.connect(nf);nf.connect(ng);ng.connect(ctx2.destination);
+    src.start(t);src.stop(t+len+0.05);
+  }
+}
+$('sPlay').onclick=()=>renderSfx(ac());
+$('sExport').onclick=async()=>{
+  const len=+$('sLen').value/100+0.2;
+  const off=new OfflineAudioContext(1,Math.ceil(44100*len),44100);
+  renderSfx(off);
+  const buf=await off.startRendering();
+  dl('kaiju-sfx.wav',new Blob([wav(buf)],{type:'audio/wav'}));
+};
+function wav(buf){
+  const n=buf.length,data=buf.getChannelData(0);
+  const b=new ArrayBuffer(44+n*2),v=new DataView(b);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+n*2,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,44100,true);v.setUint32(28,88200,true);
+  v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');
+  v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++)v.setInt16(44+i*2,clamp(data[i],-1,1)*32767,true);
+  return b;
+}
+
+/* ============ export / send / project ============ */
+function dl(name,blob){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+function hasContent(c){
+  const g=c.getContext('2d');
+  const d=g.getImageData(0,0,c.width,c.height).data;
+  for(let i=3;i<d.length;i+=4)if(d[i]>8)return true;
+  return false;
+}
+$('dlPart').onclick=()=>{
+  const c=partCanvas(curSpecies,curPart,true);
+  c.toBlob(b=>dl(`${curSpecies}_${curPart}.png`,b));
+};
+/* minimal ZIP (stored, no compression) */
+function crc32(u8){
+  let c,crc=0xFFFFFFFF;
+  for(let i=0;i<u8.length;i++){
+    c=(crc^u8[i])&0xFF;
+    for(let k=0;k<8;k++)c=c&1?(c>>>1)^0xEDB88320:c>>>1;
+    crc=(crc>>>8)^c;
+  }
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function makeZip(files){
+  const chunks=[],central=[];
+  let off=0;
+  const enc=new TextEncoder();
+  for(const f of files){
+    const name=enc.encode(f.name),data=f.data,crc=crc32(data);
+    const head=new DataView(new ArrayBuffer(30));
+    head.setUint32(0,0x04034b50,true);head.setUint16(4,20,true);
+    head.setUint16(6,0,true);head.setUint16(8,0,true);
+    head.setUint32(14,crc,true);
+    head.setUint32(18,data.length,true);head.setUint32(22,data.length,true);
+    head.setUint16(26,name.length,true);
+    chunks.push(new Uint8Array(head.buffer),name,data);
+    const cd=new DataView(new ArrayBuffer(46));
+    cd.setUint32(0,0x02014b50,true);cd.setUint16(4,20,true);cd.setUint16(6,20,true);
+    cd.setUint32(16,crc,true);
+    cd.setUint32(20,data.length,true);cd.setUint32(24,data.length,true);
+    cd.setUint16(28,name.length,true);
+    cd.setUint32(42,off,true);
+    central.push(new Uint8Array(cd.buffer),name);
+    off+=30+name.length+data.length;
+  }
+  let cdLen=0;
+  for(const c of central)cdLen+=c.length;
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);
+  end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);
+  end.setUint32(12,cdLen,true);end.setUint32(16,off,true);
+  return new Blob([...chunks,...central,new Uint8Array(end.buffer)],{type:'application/zip'});
+}
+function dataURLBytes(url){
+  const b=atob(url.split(',')[1]);
+  const u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
+  return u;
+}
+$('dlZip').onclick=()=>{
+  const files=[];
+  for(const k in store)for(const part in store[k]){
+    const c=store[k][part];
+    if(hasContent(c))
+      files.push({name:`sprites/${k}_${part}.png`,data:dataURLBytes(c.toDataURL('image/png'))});
+  }
+  if(!files.length){toast('No painted parts yet');return;}
+  dl('sprites.zip',makeZip(files));
+};
+const GAME_URL='https://fabianb14.github.io/TitanSandbox/';
+$('sendGame').onclick=()=>{
+  const map={};
+  let n=0;
+  for(const k in store)for(const part in store[k]){
+    const c=store[k][part];
+    if(hasContent(c)){map[`${k}_${part}`]=c.toDataURL('image/png');n++;}
+  }
+  if(!n){toast('Paint or generate at least one part first');return;}
+  try{
+    localStorage.setItem('ts_custom_sprites',JSON.stringify(map));
+    toast(`Sent ${n} part${n>1?'s':''} to Titan Sandbox — open the game!`);
+  }catch(e){
+    toast('Too large for browser storage — use sprites.zip instead');
+  }
+};
+$('openGame').onclick=()=>window.open(GAME_URL,'_blank');
+$('clearSend').onclick=()=>{
+  localStorage.removeItem('ts_custom_sprites');
+  toast('Your skins were removed from the game');
+};
+/* project save/load */
+function projectJSON(){
+  const parts={};
+  for(const k in store)for(const p in store[k])
+    if(hasContent(store[k][p]))parts[`${k}_${p}`]=store[k][p].toDataURL('image/png');
+  return JSON.stringify({v:1,parts});
+}
+let saveT=null;
+function saveSoon(){
+  clearTimeout(saveT);
+  saveT=setTimeout(()=>{
+    try{localStorage.setItem('kf_autosave',projectJSON());}catch(e){}
+  },800);
+}
+$('projSave').onclick=()=>dl('kaiju.kaijuforge',new Blob([projectJSON()],{type:'application/json'}));
+$('projLoadBtn').onclick=()=>$('projLoad').click();
+$('projLoad').onchange=e=>{
+  const f=e.target.files[0];
+  if(!f)return;
+  f.text().then(txt=>{loadProject(txt);toast('Project loaded');});
+  e.target.value='';
+};
+function loadProject(txt){
+  try{
+    const j=JSON.parse(txt);
+    for(const key in (j.parts||{})){
+      const m=key.match(/^(\w+)_(torso|head|jaw|arm|leg|tail0|tail1|tail2|wings)$/);
+      if(!m||!SPECIES[m[1]])continue;
+      const img=new Image();
+      img.onload=()=>{
+        const c=partCanvas(m[1],m[2],true);
+        const g=c.getContext('2d');
+        g.clearRect(0,0,c.width,c.height);
+        g.drawImage(img,0,0,c.width,c.height);
+        if(m[1]===curSpecies&&m[2]===curPart)redraw();
+      };
+      img.src=j.parts[key];
+    }
+  }catch(e){toast('Could not read project file');}
+}
+
+/* ============ UI wiring ============ */
+const spSel=$('species');
+for(const k in SPECIES){
+  const o=document.createElement('option');
+  o.value=k;o.textContent=NAMES[k];
+  spSel.appendChild(o);
+}
+spSel.onchange=()=>{curSpecies=spSel.value;history=[];future=[];obj=null;fitView();};
+const tabs=$('partTabs');
+for(const p of PARTS){
+  const b=document.createElement('button');
+  b.textContent=p;
+  b.dataset.p=p;
+  if(p===curPart)b.classList.add('active');
+  b.onclick=()=>{
+    curPart=p;history=[];future=[];obj=null;
+    tabs.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
+    fitView();
+  };
+  tabs.appendChild(b);
+}
+document.querySelectorAll('#toolCol button').forEach(b=>{
+  b.onclick=()=>{
+    tool=b.dataset.t;
+    document.querySelectorAll('#toolCol button').forEach(x=>x.classList.toggle('active',x===b));
+  };
+});
+document.querySelectorAll('.acc>.hd').forEach(h=>{
+  h.onclick=()=>h.parentElement.classList.toggle('open');
+});
+window.addEventListener('resize',fitView);
+
+/* boot */
+const auto=localStorage.getItem('kf_autosave');
+if(auto)loadProject(auto);
+fitView();
+(function loop(now){
+  requestAnimationFrame(loop);
+  drawPreview(now||0);
+  vfxStep(now||0);
+})(0);
+window.KF={store,partCanvas,get curSpecies(){return curSpecies;},projectJSON,SPECIES,PARTS};
+})();
+</script>
+</body>
+</html>
