@@ -228,9 +228,11 @@ const SPECIES={
   kru:{z:1.02,armL:1.2,legL:0.8,tailZ:0.5,fur:false,serpent:false},
   mag:{z:1.08,armL:1.0,legL:0.95,tailZ:0.9,fur:false,serpent:false},
   umb:{z:1.04,armL:0.95,legL:1.05,tailZ:1.15,fur:false,serpent:false},
+  cob:{z:1.05,armL:1,legL:1,tailZ:1.05,fur:false,serpent:false},
+  bor:{z:1.12,armL:1,legL:1,tailZ:1.0,fur:false,serpent:false,quad:true},
 };
 const NAMES={titan:'Titan',ape:'Goliath',drax:'Ravok',scorn:'Scorn',mecha:'Meka',hydrax:'Hydrax',vang:'Vanguard',
-  sky:'Skyrend',lum:'Lumen',fen:'Fenrix',kru:'Krustor',mag:'Magnar',umb:'Umbrax'};
+  sky:'Skyrend',lum:'Lumen',fen:'Fenrix',kru:'Krustor',mag:'Magnar',umb:'Umbrax',cob:'Cobalt',bor:'Boreas'};
 const PARTS=['torso','head','jaw','arm','leg','tail0','tail1','tail2','wings'];
 function dims(k){
   const sp=SPECIES[k],s=sp.z;
@@ -243,6 +245,12 @@ function dims(k){
   const tz=sp.tailZ,th2=Math.min(1,tz+0.3);
   D.tail=[[102*s*tz,46*s*th2],[92*s*tz,32*s*th2],[86*s*tz,20*s*th2]];
   if(sp.serpent)D.tail=[[128*s,62*s],[112*s,46*s],[96*s,30*s]];
+  if(sp.quad){
+    D.torsoW=150*s;D.torsoH=150*s;
+    D.headW=100*s;D.headH=66*s;D.jawW=68*s;D.jawH=18*s;
+    D.legW=46*s;D.legH=120*s*sp.legL;
+    D.tail=[[104*s,44*s],[92*s,30*s],[80*s,18*s]];
+  }
   D.standH=D.legH+D.torsoH/2-34*s;
   D.s=s;
   return D;
