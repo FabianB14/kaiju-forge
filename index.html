@@ -220,7 +220,7 @@ const SPECIES={
   drax:{z:1.05,armL:1,legL:1,tailZ:1.1,fur:false,serpent:true},
   scorn:{z:1.04,armL:0.5,legL:1,tailZ:1.25,fur:false,serpent:false},
   mecha:{z:1.03,armL:1,legL:1,tailZ:0.9,fur:false,serpent:false},
-  hydrax:{z:1.06,armL:0.8,legL:1,tailZ:1.15,fur:false,serpent:false},
+  hydrax:{z:1.06,armL:0.8,legL:1,tailZ:1.15,fur:false,serpent:false,wingBig:1.28},
   vang:{z:1.02,armL:1.05,legL:1.05,tailZ:0.45,fur:false,serpent:false},
   sky:{z:0.98,armL:0.7,legL:0.9,tailZ:1.0,fur:false,serpent:false},
   lum:{z:0.95,armL:0.6,legL:0.85,tailZ:0.8,fur:false,serpent:false},
@@ -266,7 +266,7 @@ function partSize(k,part){
     case 'tail0':return [D.tail[0][0]+60*s,D.tail[0][1]+60*s];
     case 'tail1':return [D.tail[1][0]+60*s,D.tail[1][1]+60*s];
     case 'tail2':return [D.tail[2][0]+60*s,D.tail[2][1]+60*s];
-    case 'wings':return [D.torsoW*2.6,D.torsoH*1.35];
+    case 'wings':{const b=SPECIES[k].wingBig||1;return [D.torsoW*2.6*b,D.torsoH*1.35*b];}
   }
 }
 const PART_HINT={
